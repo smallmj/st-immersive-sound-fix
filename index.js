@@ -187,7 +187,7 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
         '.st-is-lyrics-player.lp-mini .st-is-lyrics-time{display:none!important}',
         '.st-is-lyrics-player.lp-mini .lp-fullscreen-btn{display:none!important}',
         '.lp-mini-current-line{padding:10px 16px;text-align:center;font-size:15px;line-height:1.4;',
-        'color:var(--lp-titlebar-text,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
+        'color:var(--lp-titlebar-text,#fff);white-space:normal;word-break:break-word;overflow-wrap:break-word;',
         'flex-shrink:0;min-height:20px;opacity:.95;user-select:none;-webkit-user-select:none;cursor:move}'
     ].join('');
     (document.head || document.documentElement).appendChild(style);
