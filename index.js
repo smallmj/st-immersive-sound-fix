@@ -169,3 +169,92 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
     scan();
     new MutationObserver(scan).observe(document.body, { childList: true });
 })();
+;/* ===== 歌词播放器 mini 模式补丁（st-immersive-sound-fix）=====
+ * 默认以 mini 小窗显示：顶部+进度条+功能按钮+单行当前歌词。
+ * 标题栏「展开/收起」按钮可切回完整滚动歌词模式。
+ * 与拖拽增强补丁共存，不改动混淆代码。
+ */
+(function () {
+    'use strict';
+
+    // ---------- 注入样式 ----------
+    const style = document.createElement('style');
+    style.id = 'lp-mini-style';
+    style.textContent = [
+        '.st-is-lyrics-player.lp-mini{height:auto!important;max-height:90vh!important;width:380px!important;transition:none!important}',
+        '@media (max-width:767px),(max-height:600px){.st-is-lyrics-player.lp-mini{width:92vw!important}}',
+        '.st-is-lyrics-player.lp-mini .st-is-lyrics-content{display:none!important}',
+        '.st-is-lyrics-player.lp-mini .st-is-lyrics-time{display:none!important}',
+        '.st-is-lyrics-player.lp-mini .lp-fullscreen-btn{display:none!important}',
+        '.lp-mini-current-line{padding:10px 16px;text-align:center;font-size:15px;line-height:1.4;',
+        'color:var(--lp-titlebar-text,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
+        'flex-shrink:0;min-height:20px;opacity:.95;user-select:none;-webkit-user-select:none;cursor:move}'
+    ].join('');
+    (document.head || document.documentElement).appendChild(style);
+
+    const PLAYER_SEL = '.st-is-lyrics-player';
+
+    function getCurrentLineText(container) {
+        const active = container.querySelector('.st-is-lyrics-line.active');
+        if (!active) return '';
+        return active.textContent.replace(/\u00A0/g, ' ').trim();
+    }
+
+    function syncCurrentLine(container) {
+        const line = container.querySelector('.lp-mini-current-line');
+        if (!line) return;
+        const text = getCurrentLineText(container);
+        line.textContent = text || '-';
+        line.title = text; // 桌面悬停看完整文本
+    }
+
+    function attach(container) {
+        if (container.dataset.lpMiniPatched === '1') return;
+        container.dataset.lpMiniPatched = '1';
+
+        const actions = container.querySelector('.st-is-lyrics-titlebar-actions');
+        const content = container.querySelector('.st-is-lyrics-content');
+        if (!actions || !content) return;
+
+        // 标记全屏按钮（actions 中第一个标题栏按钮），mini 模式下隐藏
+        const fullscreenBtn = actions.querySelector('.st-is-lyrics-titlebar-btn');
+        if (fullscreenBtn) fullscreenBtn.classList.add('lp-fullscreen-btn');
+
+        // 插入「展开/收起」按钮（放在 actions 最前）
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'st-is-lyrics-titlebar-btn lp-mini-toggle';
+        toggleBtn.title = '展开/收起歌词';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>'; // mini 时显示「向下展开」
+        actions.insertBefore(toggleBtn, actions.firstChild);
+
+        // 插入单行当前歌词区（controls 之后、content 之前）
+        const currentLine = document.createElement('div');
+        currentLine.className = 'lp-mini-current-line';
+        content.parentNode.insertBefore(currentLine, content);
+
+        // 默认 mini
+        container.classList.add('lp-mini');
+        syncCurrentLine(container);
+
+        // 切换逻辑
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isMini = container.classList.toggle('lp-mini');
+            const icon = toggleBtn.querySelector('i');
+            if (icon) icon.className = isMini ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+            if (isMini) syncCurrentLine(container);
+        });
+
+        // 监听歌词行 active 变化，同步单行歌词
+        const obs = new MutationObserver(() => {
+            if (container.classList.contains('lp-mini')) syncCurrentLine(container);
+        });
+        obs.observe(content, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+
+    function scan() {
+        document.querySelectorAll(PLAYER_SEL).forEach(attach);
+    }
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true });
+})();
