@@ -258,61 +258,6 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
     scan();
     new MutationObserver(scan).observe(document.body, { childList: true });
 })();
-;/* ===== 歌词播放器可见时禁用双击停止播放（st-immersive-sound-fix）=====
- * 双击停止由 ifram.js handleDoubleClick 触发，双击监听绑在 .mes_text 和
- * 各 iframe 的 contentDocument.body 上。iframe 内双击不冒泡到主 document，
- * 所以必须在主 document 和每个 iframe document 都挂 capture 拦截。
- */
-(function () {
-    'use strict';
-    function lpVisible() {
-        const lp = document.querySelector('.st-is-lyrics-player');
-        return !!(lp && getComputedStyle(lp).display !== 'none');
-    }
-    // 主文档播放器包含判断（iframe 内 target 跨 document，try/catch 兜底）
-    function lpContainsMain(target) {
-        const lp = document.querySelector('.st-is-lyrics-player');
-        try { return !!(lp && lp.contains(target)); } catch (_) { return false; }
-    }
-    function block(e) {
-        if (!lpVisible()) return;
-        if (lpContainsMain(e.target)) return;
-        e.stopPropagation();
-        e.preventDefault();
-    }
-    // 移动端 touchend 双击检测（每个 document 独立计时）
-    function makeTouchEndHandler() {
-        let lastTap = 0;
-        return function (e) {
-            if (!lpVisible() || lpContainsMain(e.target)) return;
-            const now = Date.now();
-            if (now - lastTap > 0 && now - lastTap < 250) {
-                e.stopPropagation();
-                e.preventDefault();
-                lastTap = 0;
-            } else {
-                lastTap = now;
-            }
-        };
-    }
-    const attached = new WeakSet();
-    function attachTo(doc) {
-        if (!doc || attached.has(doc)) return;
-        try {
-            doc.addEventListener('dblclick', block, true);
-            doc.addEventListener('touchend', makeTouchEndHandler(), true);
-            attached.add(doc);
-        } catch (_) { /* 跨域 iframe */ }
-    }
-    function scanIframes() {
-        document.querySelectorAll('iframe').forEach(iframe => {
-            try { attachTo(iframe.contentDocument); } catch (_) {}
-        });
-    }
-    attachTo(document);
-    scanIframes();
-    setInterval(scanIframes, 3000);
-})();
 ;/* ===== mini 模式音量面板溢出修复（st-immersive-sound-fix）=====
  * mini 容器变矮后音量面板向下展开会被 overflow:hidden 裁剪。
  * mini 模式下改 overflow:visible 让面板溢出显示，并补标题栏/单行区圆角保持外观。
@@ -331,4 +276,48 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
         '}'
     ].join('');
     (document.head || document.documentElement).appendChild(style);
+})();
+;/* ===== 双击停止后允许点播放按钮恢复播放（st-immersive-sound-fix）=====
+ * 根因：cancelImmersiveSoundSession 自增会话计数器，engine 旧 playbackSessionId 失效，
+ * resume 调 playList 时 isSessionActive(旧id) 返回 false 被 abort，音频不 start。
+ * 修复：hook cancel 记录被停 engine 的旧 id；hook isImmersiveSoundSessionActive 放行该 id。
+ */
+(function () {
+    'use strict';
+    let allowSessionId = null;
+
+    function tryHookCancel() {
+        const orig = window.cancelImmersiveSoundSession;
+        if (typeof orig !== 'function' || orig.__lpResumeHook) return false;
+        const wrapped = function (...args) {
+            try {
+                const m = window.marker;
+                if (m && m.options && m.options.playbackSessionId != null) {
+                    allowSessionId = m.options.playbackSessionId;
+                }
+            } catch (_) {}
+            return orig.apply(this, args);
+        };
+        wrapped.__lpResumeHook = true;
+        window.cancelImmersiveSoundSession = wrapped;
+        return true;
+    }
+
+    function tryHookActive() {
+        const orig = window.isImmersiveSoundSessionActive;
+        if (typeof orig !== 'function' || orig.__lpResumeHook) return false;
+        const wrapped = function (id) {
+            if (allowSessionId != null && id === allowSessionId) return true;
+            return orig.call(this, id);
+        };
+        wrapped.__lpResumeHook = true;
+        window.isImmersiveSoundSessionActive = wrapped;
+        return true;
+    }
+
+    function tryAll() { return tryHookCancel() | tryHookActive(); }
+    if (!tryAll()) {
+        let tries = 0;
+        const t = setInterval(() => { if (tryAll() || ++tries > 120) clearInterval(t); }, 500);
+    }
 })();
