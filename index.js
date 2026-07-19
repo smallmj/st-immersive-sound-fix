@@ -266,7 +266,7 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
     'use strict';
     function lpVisible() {
         const lp = document.querySelector('.st-is-lyrics-player');
-        return !!(lp && lp.offsetParent !== null);
+        return !!(lp && getComputedStyle(lp).display !== 'none');
     }
     function lpContains(target) {
         const lp = document.querySelector('.st-is-lyrics-player');
