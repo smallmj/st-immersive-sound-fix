@@ -258,3 +258,37 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
     scan();
     new MutationObserver(scan).observe(document.body, { childList: true });
 })();
+;/* ===== 歌词播放器可见时禁用双击停止播放（st-immersive-sound-fix）=====
+ * 歌词播放器可见时屏蔽双击停止（桌面 dblclick + 移动端 touchend 双击），
+ * 避免误触；歌词播放器内部交互不受影响，用播放器的暂停/关闭按钮控制。
+ */
+(function () {
+    'use strict';
+    function lpVisible() {
+        const lp = document.querySelector('.st-is-lyrics-player');
+        return !!(lp && lp.offsetParent !== null);
+    }
+    function lpContains(target) {
+        const lp = document.querySelector('.st-is-lyrics-player');
+        return !!(lp && lp.contains(target));
+    }
+    // 桌面 dblclick
+    document.addEventListener('dblclick', (e) => {
+        if (!lpVisible() || lpContains(e.target)) return;
+        e.stopPropagation();
+        e.preventDefault();
+    }, true);
+    // 移动端 touchend 双击检测
+    let lastTap = 0;
+    document.addEventListener('touchend', (e) => {
+        if (!lpVisible() || lpContains(e.target)) return;
+        const now = Date.now();
+        if (now - lastTap > 0 && now - lastTap < 250) {
+            e.stopPropagation();
+            e.preventDefault();
+            lastTap = 0;
+        } else {
+            lastTap = now;
+        }
+    }, true);
+})();
