@@ -259,11 +259,13 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
     new MutationObserver(scan).observe(document.body, { childList: true });
 })();
 ;/* ===== 歌词播放器可见时禁用双击停止播放（st-immersive-sound-fix）=====
- * 歌词播放器可见时屏蔽双击停止（桌面 dblclick + 移动端 touchend 双击），
- * 避免误触；歌词播放器内部交互不受影响，用播放器的暂停/关闭按钮控制。
+ * 双击停止走 window.cancelImmersiveSoundSession（ifram.js handleDoubleClick 548-559）。
+ * 方案：双击事件设抑制标志 + hook cancelImmersiveSoundSession 检查标志，
+ * 歌词播放器可见时拦截双击停止；stopButton 等主动停止（click 触发）不受影响。
  */
 (function () {
     'use strict';
+    let suppressStop = false;
     function lpVisible() {
         const lp = document.querySelector('.st-is-lyrics-player');
         return !!(lp && getComputedStyle(lp).display !== 'none');
@@ -272,11 +274,16 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
         const lp = document.querySelector('.st-is-lyrics-player');
         return !!(lp && lp.contains(target));
     }
+    function flagAndStop(e) {
+        suppressStop = true;
+        setTimeout(() => { suppressStop = false; }, 60);
+        e.stopPropagation();
+        e.preventDefault();
+    }
     // 桌面 dblclick
     document.addEventListener('dblclick', (e) => {
         if (!lpVisible() || lpContains(e.target)) return;
-        e.stopPropagation();
-        e.preventDefault();
+        flagAndStop(e);
     }, true);
     // 移动端 touchend 双击检测
     let lastTap = 0;
@@ -284,13 +291,28 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
         if (!lpVisible() || lpContains(e.target)) return;
         const now = Date.now();
         if (now - lastTap > 0 && now - lastTap < 250) {
-            e.stopPropagation();
-            e.preventDefault();
+            flagAndStop(e);
             lastTap = 0;
         } else {
             lastTap = now;
         }
     }, true);
+    // hook cancelImmersiveSoundSession：双击抑制标志存在时不执行（拦截双击停止）
+    function tryWrap() {
+        const orig = window.cancelImmersiveSoundSession;
+        if (typeof orig !== 'function' || orig.__lpWrapped) return false;
+        const wrapped = function (...args) {
+            if (suppressStop) { console.log('[lp-patch] 拦截双击停止播放'); return; }
+            return orig.apply(this, args);
+        };
+        wrapped.__lpWrapped = true;
+        window.cancelImmersiveSoundSession = wrapped;
+        return true;
+    }
+    if (!tryWrap()) {
+        let tries = 0;
+        const t = setInterval(() => { if (tryWrap() || ++tries > 120) clearInterval(t); }, 500);
+    }
 })();
 ;/* ===== mini 模式音量面板溢出修复（st-immersive-sound-fix）=====
  * mini 容器变矮后音量面板向下展开会被 overflow:hidden 裁剪。
