@@ -292,3 +292,22 @@ const _0x4edb4c=_0x19ce;(function(_0x980176,_0x3517c8){const _0x2d31f7=_0x19ce,_
         }
     }, true);
 })();
+;/* ===== mini 模式音量面板溢出修复（st-immersive-sound-fix）=====
+ * mini 容器变矮后音量面板向下展开会被 overflow:hidden 裁剪。
+ * mini 模式下改 overflow:visible 让面板溢出显示，并补标题栏/单行区圆角保持外观。
+ */
+(function () {
+    'use strict';
+    const style = document.createElement('style');
+    style.id = 'lp-mini-volume-style';
+    style.textContent = [
+        '.st-is-lyrics-player.lp-mini{overflow:visible!important}',
+        '.st-is-lyrics-player.lp-mini .st-is-lyrics-titlebar{border-top-left-radius:16px!important;border-top-right-radius:16px!important}',
+        '.st-is-lyrics-player.lp-mini .lp-mini-current-line{border-bottom-left-radius:16px!important;border-bottom-right-radius:16px!important}',
+        '@media (max-width:767px),(max-height:600px){',
+        '.st-is-lyrics-player.lp-mini .st-is-lyrics-titlebar{border-top-left-radius:12px!important;border-top-right-radius:12px!important}',
+        '.st-is-lyrics-player.lp-mini .lp-mini-current-line{border-bottom-left-radius:12px!important;border-bottom-right-radius:12px!important}',
+        '}'
+    ].join('');
+    (document.head || document.documentElement).appendChild(style);
+})();
