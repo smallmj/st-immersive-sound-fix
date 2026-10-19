@@ -2,7 +2,7 @@
 
 **原作者:** 从前跟你一样
 **本 Fork 维护:** smallmj
-**版本:** 3.0.3（基于上游 3.0.3）
+**版本:** 3.1.0（基于上游 3.0.3）
 
 这是 [damoshen123/st-immersive-sound](https://github.com/damoshen123/st-immersive-sound) 的个人修复 fork，为 [SillyTavern](https://github.com/SillyTavern/SillyTavern) 设计的第三方扩展：通过 AI 驱动的背景音乐（BGM）、环境音（Ambiance）、音效（SFX）和语音合成（TTS），为阅读体验带来真正的"声临其境"。
 
@@ -16,6 +16,15 @@
 - **歌词高亮修复**：清理了原版中从未生效的死代码高亮实现
 - **构建链路重建**：上游只发布混淆产物、无源码无构建脚本；本 fork 完整还原了入口源码（`index.src.js`）与构建脚本（`build.js`），所有改动都是源码级的，产物字节级可复现、可审阅、未混淆
 - **资源路径自持**：插件资源（CSS/Tone.js 等）从插件自身目录加载，不再硬编码指向特定目录名
+
+## 🧠 LLM 思考等级（v3.1.0 新增）
+
+「大模型设置」的每个 LLM 预设新增**思考等级**选项：跟随服务端默认 / off / low / medium / high / xhigh。选中档位后，插件会在 `/chat/completions` 请求里附带 `reasoning_effort` 字段（off 以 `none` 发送）。
+
+- 已在 Strata（Windows 本地引擎）上实测：五档均被接受并真实影响 prompt（`none` 直接出答案不思考，low/high/xhigh 注入不同强度的思考指令）。
+- **酒馆代理路径（未开「绕过酒馆代理」）会丢弃该字段**（SillyTavern 白名单化请求体）——需要思考等级生效请开启直连。
+- 未知档位会被 Strata 静默按 medium 处理，不会报错。
+- 面板上的「查询服务端能力」按钮（仅直连可用）可查看服务端模型列表、上下文长度与模板能力。
 
 ## 🚀 安装
 
@@ -178,15 +187,6 @@ npm run build   # esbuild 打包 → 生成 index.js（未混淆，字节级可�
 
 ---
 享受你的沉浸式阅读体验吧！
-
-## LLM 思考等级（reasoning effort）
-
-「大模型设置」的每个 LLM 预设新增**思考等级**选项：跟随服务端默认 / off / low / medium / high / xhigh。选中档位后，插件会在 `/chat/completions` 请求里附带 `reasoning_effort` 字段（off 以 `none` 发送）。
-
-- 已在 Strata（Windows 本地引擎）上实测：五档均被接受并真实影响 prompt（`none` 直接出答案不思考，low/high/xhigh 注入不同强度的思考指令）。
-- **酒馆代理路径（未开「绕过酒馆代理」）会丢弃该字段**（SillyTavern 白名单化请求体）——需要思考等级生效请开启直连。
-- 未知档位会被 Strata 静默按 medium 处理，不会报错。
-- 面板上的「查询服务端能力」按钮（仅直连可用）可查看服务端模型列表、上下文长度与模板能力。
 
 ## 帮助
 

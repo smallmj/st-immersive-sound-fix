@@ -1,7 +1,7 @@
 {
   "name": "st-chatu8",
-  "version": "1.0.0",
-  "description": "**作者:** 从前跟你一样\r **版本:** 1.0.0",
+  "version": "3.1.0",
+  "description": "**作者:** 从前跟你一样\r **版本:** 3.1.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
