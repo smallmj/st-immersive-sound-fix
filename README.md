@@ -1,11 +1,47 @@
-# SillyTavern 声临其境 (Immersive Sound)
+# SillyTavern 声临其境 · 修复版 (st-immersive-sound-fix)
 
-**作者:** 从前跟你一样
-**版本:** 2.0.0
+**原作者:** 从前跟你一样
+**本 Fork 维护:** smallmj
+**版本:** 3.0.3（基于上游 3.0.3）
 
-这是一个为 [SillyTavern](https://github.com/SillyTavern/SillyTavern) 设计的第三方扩展，旨在通过 AI 驱动的背景音乐（BGM）、环境音（Ambiance）、音效（SFX）和语音合成（TTS），为用户的阅读体验带来真正的“声临其境”。
+这是 [damoshen123/st-immersive-sound](https://github.com/damoshen123/st-immersive-sound) 的个人修复 fork，为 [SillyTavern](https://github.com/SillyTavern/SillyTavern) 设计的第三方扩展：通过 AI 驱动的背景音乐（BGM）、环境音（Ambiance）、音效（SFX）和语音合成（TTS），为阅读体验带来真正的"声临其境"。
 
-当用户双击一条消息时，此插件不仅能像卡拉OK一样逐字高亮文本，还能将消息内容发送给大语言模型（LLM）进行分析，并自动生成一套完整的、与故事情节同步的音频播放方案。
+## 🔧 本 Fork 的改动
+
+在原版基础上的修复与增强：
+
+- **歌词播放器拖拽修复**：手机端标题栏被拖出屏幕后无法拖回的问题；拖拽全程有边界夹紧，按钮/进度条不再误触发拖拽
+- **mini 迷你播放器**：默认小窗模式只显示当前句歌词，可一键展开切回完整播放器；修复 mini 模式下音量面板被容器裁剪显示不全的问题
+- **双击停止后可恢复播放**：双击停止后再次点击播放按钮直接续播，不再被会话校验中断（原版会静默 abort）
+- **歌词高亮修复**：清理了原版中从未生效的死代码高亮实现
+- **构建链路重建**：上游只发布混淆产物、无源码无构建脚本；本 fork 完整还原了入口源码（`index.src.js`）与构建脚本（`build.js`），所有改动都是源码级的，产物字节级可复现、可审阅、未混淆
+- **资源路径自持**：插件资源（CSS/Tone.js 等）从插件自身目录加载，不再硬编码指向特定目录名
+
+## 🚀 安装
+
+1. 在 SillyTavern 中通过 `扩展 → 安装扩展`（旧版入口：`第三方扩展 → 下载扩展`）安装本 fork 的仓库地址：
+
+   ```
+   https://github.com/smallmj/st-immersive-sound-fix
+   ```
+
+2. 重启 SillyTavern。
+3. 在 `扩展` 菜单中启用 **"沉浸式音效（修复版）"**（扩展 ID：`st-immersive-sound-fix`）。
+
+> ⚠️ **与原版互斥**：本 fork 与原版 `st-immersive-sound` 使用相同的数据键和 DOM id，**不能同时启用**，启用前请先在扩展面板中禁用原版。
+
+### 从源码构建（开发者）
+
+```bash
+npm install
+npm run build   # esbuild 打包 → 生成 index.js（未混淆，字节级可复现）
+```
+
+构建细节与踩坑记录见 [build/README.md](build/README.md)。
+
+---
+
+以下为上游原版功能说明。
 
 ## ✨ 核心功能
 
@@ -145,7 +181,8 @@
 
 ## 帮助
 
-[飞书文档](https://gxcgf4l6b2y.feishu.cn/wiki/IS3xwfqG7ii78pkwqkkcE8donUb?from=from_copylink) | [投喂作者](https://afdian.com/a/cqgnyy)
+- 原版功能疑问 / 投喂原作者：[飞书文档](https://gxcgf4l6b2y.feishu.cn/wiki/IS3xwfqG7ii78pkwqkkcE8donUb?from=from_copylink) | [投喂作者](https://afdian.com/a/cqgnyy)
+- 本 fork 的问题请到 [issues](https://github.com/smallmj/st-immersive-sound-fix/issues) 反馈
 
 ## 许可证
 
