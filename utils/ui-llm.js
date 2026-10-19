@@ -480,7 +480,7 @@ async function onQueryCapsClick() {
         } else {
             lines.push(`/props 查询失败: HTTP ${propsRes.status}（非 Strata 类服务端可能不支持）`);
         }
-        lines.push('思考等级档位: off / low / medium / high / xhigh（服务端不支持某档时请求会返回 400）');
+        lines.push('思考等级档位: off / low / medium / high / xhigh（Strata 对未知档位静默按 medium 处理；其他服务端可能返回 400）');
         if (capsResultSpan) capsResultSpan.text(lines.join('\n'));
         toastr.success('服务端能力查询完成。');
     } catch (error) {
