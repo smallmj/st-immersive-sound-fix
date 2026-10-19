@@ -169,7 +169,24 @@
                     <input class="st-is-range-input" type="number" id="llm_max_tokens_value" data-for="llm_max_tokens" min="1" max="4096" step="1" value="512">
                 </div>
             </div>
+            <div class="st-is-field">
+                <label for="llm_reasoning_effort">思考等级</label>
+                <select id="llm_reasoning_effort" class="st-is-select">
+                    <option value="">跟随服务端默认</option>
+                    <option value="none">off（关闭思考）</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                    <option value="xhigh">xhigh</option>
+                </select>
+            </div>
         </div>
+        <small style="color: var(--st-is-text-secondary); display:block; margin:-6px 0 8px 4px;">
+            控制 LLM 的思考强度，随请求发送 reasoning_effort 字段。「跟随服务端默认」不发送该字段；off 会以 none 发送。
+            注意：实测酒馆代理路径会丢弃该字段，需要思考等级生效请开启「绕过酒馆代理」（直连）。未知档位会被 Strata 静默按 medium 处理。
+            <button class="st-is-btn" id="llm_query_caps_button" style="margin-left:6px;"><i class="fa-solid fa-circle-info"></i> 查询服务端能力</button>
+            <span id="llm_caps_result" style="display:block; margin-top:4px; white-space:pre-wrap;"></span>
+        </small>
     </div>
 
     <div class="st-is-settings-section">

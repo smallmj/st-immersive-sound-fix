@@ -21,6 +21,8 @@ let temperatureSlider, temperatureValue, topPSlider, topPValue, maxTokensSlider,
 let testButton, resultTextarea, llmTestModeToggle, combinedPromptTextarea;
 // 高级请求开关（与 AI 助手设置一致，存到当前 LLM 预设里）
 let streamToggle, bypassProxyToggle, mergeSystemUserToggle, sendImagesToggle;
+// 思考等级（reasoning effort）选择，存到当前 LLM 预设里
+let reasoningEffortSelect, queryCapsButton, capsResultSpan;
 // 自定义模型名（手动输入会覆盖 modelSelect）
 let modelCustomInput;
 let currentLLMRequestController;
@@ -265,6 +267,9 @@ function onProfileSelectChange() {
         mergeSystemUserToggle.prop('checked', profile.merge_system_user !== false); // 默认 true
         sendImagesToggle.prop('checked', !!profile.send_images);
 
+        // 思考等级（缺省 = 跟随服务端默认）
+        if (reasoningEffortSelect) reasoningEffortSelect.val(profile.reasoning_effort || '');
+
         extension_settings[extensionName].current_llm_profile = profileName;
         saveSettingsDebounced();
     }
@@ -298,6 +303,8 @@ function collectProfileDataFromUI() {
         bypass_proxy: !!bypassProxyToggle?.prop('checked'),
         merge_system_user: !!mergeSystemUserToggle?.prop('checked'),
         send_images: !!sendImagesToggle?.prop('checked'),
+        // 思考等级：'' 表示不发送该字段（跟随服务端默认）
+        reasoning_effort: (reasoningEffortSelect?.val() || '').trim(),
         // 保留向后兼容字段（不会被新 UI 修改）
         history: existing.history
     };
@@ -436,6 +443,56 @@ function onImportProfileClick() {
 }
 
 /**
+ * 查询服务端能力（仅直连预设可用）：GET /v1/models + /props。
+ * 展示模型列表、上下文长度、模板能力等信息，帮助确认思考等级可用。
+ */
+async function onQueryCapsClick() {
+    const baseUrl = (apiUrlInput.val() || '').replace(/\/$/, '');
+    const apiKey = apiKeyInput.val();
+    if (!baseUrl || !apiKey) {
+        toastr.warning('请先填写 API Base URL 和 API Key。');
+        return;
+    }
+    const root = baseUrl.replace(/\/v1\/?$/, '');
+    const original = queryCapsButton.html();
+    queryCapsButton.html('<i class="fa-solid fa-spinner fa-spin"></i>');
+    queryCapsButton.prop('disabled', true);
+    try {
+        const headers = { 'Authorization': `Bearer ${apiKey}` };
+        const [modelsRes, propsRes] = await Promise.all([
+            fetch(root + '/v1/models', { headers }),
+            fetch(root + '/props', { headers }),
+        ]);
+        const lines = [];
+        if (modelsRes.ok) {
+            const models = tryParseJsonText(await modelsRes.text())?.data || [];
+            lines.push(`模型 (${models.length}): ${models.map(m => m.id).join(', ') || '无'}`);
+        } else {
+            lines.push(`/v1/models 查询失败: HTTP ${modelsRes.status}`);
+        }
+        if (propsRes.ok) {
+            const props = tryParseJsonText(await propsRes.text()) || {};
+            if (props.default_generation_settings?.n_ctx) lines.push(`上下文长度: ${props.default_generation_settings.n_ctx}`);
+            if (props.model_alias) lines.push(`模型别名: ${props.model_alias}`);
+            if (props.build_info) lines.push(`服务端: ${props.build_info}`);
+            const caps = props.chat_template_caps;
+            if (caps) lines.push(`模板能力: ${Object.entries(caps).filter(([, v]) => v === true).map(([k]) => k).join(', ') || '无'}`);
+        } else {
+            lines.push(`/props 查询失败: HTTP ${propsRes.status}（非 Strata 类服务端可能不支持）`);
+        }
+        lines.push('思考等级档位: off / low / medium / high / xhigh（Strata 对未知档位静默按 medium 处理；其他服务端可能返回 400）');
+        if (capsResultSpan) capsResultSpan.text(lines.join('\n'));
+        toastr.success('服务端能力查询完成。');
+    } catch (error) {
+        if (capsResultSpan) capsResultSpan.text(`查询失败: ${error.message}`);
+        toastr.error(`查询失败: ${error.message}`);
+    } finally {
+        queryCapsButton.html(original);
+        queryCapsButton.prop('disabled', false);
+    }
+}
+
+/**
  * Fetches the list of available models from the API.
  */
 async function onFetchModelsClick() {
@@ -542,6 +599,9 @@ async function onTestLLMClick() {
             max_tokens: max_tokens,
             stream: false,
         };
+        // 思考等级：选中非默认档位时随测试请求发送
+        const effort = (collectProfileDataFromUI().reasoning_effort || '').trim();
+        if (effort) body.reasoning_effort = effort;
 
         const response = await fetch(requestUrl, {
             method: 'POST',
@@ -711,6 +771,9 @@ export function initLLMSettings() {
     mergeSystemUserToggle = $('#llm_merge_system_user');
     sendImagesToggle = $('#llm_send_images');
     modelCustomInput = $('#llm_model_custom');
+    reasoningEffortSelect = $('#llm_reasoning_effort');
+    queryCapsButton = $('#llm_query_caps_button');
+    capsResultSpan = $('#llm_caps_result');
 
     // 模型下拉变更时，自动把选中的模型名同步到自定义模型输入框
     modelSelect.on('change', () => {
@@ -747,6 +810,19 @@ export function initLLMSettings() {
     bypassProxyToggle.on('change', onAdvancedToggleChange);
     mergeSystemUserToggle.on('change', onAdvancedToggleChange);
     sendImagesToggle.on('change', onAdvancedToggleChange);
+
+    // 思考等级：变更后立即写回当前预设并保存
+    reasoningEffortSelect?.on('change', () => {
+        const profileName = profileSelect.val();
+        if (!profileName) return;
+        const profiles = extension_settings[extensionName].llm_profiles || {};
+        if (!profiles[profileName]) return;
+        profiles[profileName].reasoning_effort = (reasoningEffortSelect.val() || '').trim();
+        saveSettingsDebounced();
+    });
+
+    // 查询服务端能力
+    queryCapsButton?.on('click', onQueryCapsClick);
 
     // Listen for external requests
     eventSource.on(eventNames.LLM_GET_PROMPT_REQUEST, onGetPromptRequest);
