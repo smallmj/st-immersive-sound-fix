@@ -256,11 +256,22 @@ export class LyricsPlayer {
         actions.className = 'st-is-lyrics-titlebar-actions';
 
         const btnFullscreen = document.createElement('button');
-        btnFullscreen.className = 'st-is-lyrics-titlebar-btn';
+        btnFullscreen.className = 'st-is-lyrics-titlebar-btn lp-fullscreen-btn';
         btnFullscreen.title = '全屏';
         btnFullscreen.innerHTML = '<i class="fa-solid fa-expand"></i>';
         btnFullscreen.addEventListener('click', () => this._toggleFullscreen());
         this._btnFullscreen = btnFullscreen;
+
+        // mini/完整模式切换按钮。默认进入 mini，点击展开为完整滚动歌词。
+        const btnMiniToggle = document.createElement('button');
+        btnMiniToggle.className = 'st-is-lyrics-titlebar-btn lp-mini-toggle';
+        btnMiniToggle.title = '展开/收起歌词';
+        btnMiniToggle.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+        btnMiniToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleMini();
+        });
+        this._btnMiniToggle = btnMiniToggle;
 
         const btnClose = document.createElement('button');
         btnClose.className = 'st-is-lyrics-titlebar-btn';
@@ -268,6 +279,7 @@ export class LyricsPlayer {
         btnClose.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         btnClose.addEventListener('click', () => this._handleClose());
 
+        actions.appendChild(btnMiniToggle);
         actions.appendChild(btnFullscreen);
         actions.appendChild(btnClose);
         titlebar.appendChild(title);
@@ -280,10 +292,40 @@ export class LyricsPlayer {
         let initialLeft = 0;
         let initialTop = 0;
 
+        // 拖拽边界约束：标题栏必须完整留在屏内，水平方向至少保留 minVisW 可见，
+        // 避免窗口被拖出屏幕后无法拖回或关闭（移动端高发）。
+        const clampToViewport = (left, top) => {
+            const cw = this._container.offsetWidth;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const titlebarEl = this._container.querySelector('.st-is-lyrics-titlebar');
+            const tbH = (titlebarEl && titlebarEl.offsetHeight) || 50;
+            const minVisW = Math.min(cw * 0.5, 200);
+            const clampedLeft = Math.max(-(cw - minVisW), Math.min(left, vw - minVisW));
+            const clampedTop = Math.max(0, Math.min(top, vh - tbH));
+            return [clampedLeft, clampedTop];
+        };
+
+        const isOffscreen = () => {
+            const r = this._container.getBoundingClientRect();
+            return r.top < 0 || r.bottom > window.innerHeight
+                || r.left < 0 || r.right > window.innerWidth;
+        };
+
+        // 交互元素放行：按钮/进度条/音量/右键菜单不触发拖拽
+        const DRAG_EXCLUDE = '.st-is-lyrics-titlebar-btn,.st-is-lyrics-control-btn,.st-is-lyrics-progress-track,.st-is-lyrics-progress-thumb,.st-is-lyrics-volume-container,.st-is-lyrics-context-menu';
+
         const onDragStart = (e) => {
             if (this.isFullscreen) return;
-            if (e.target.closest('.st-is-lyrics-titlebar-btn')) return;
-            
+            if (e.target.closest(DRAG_EXCLUDE)) return;
+
+            // 歌词内容区：仅当窗口已出屏时才接管拖拽（用于拖回），
+            // 否则放行原生滚动与长按选择。
+            if (!e.target.closest('.st-is-lyrics-titlebar')) {
+                const lc = this._container.querySelector('.st-is-lyrics-content');
+                if (lc && lc.contains(e.target) && !isOffscreen()) return;
+            }
+
             isDragging = true;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -315,8 +357,9 @@ export class LyricsPlayer {
             const dx = clientX - startX;
             const dy = clientY - startY;
 
-            this._container.style.left = `${initialLeft + dx}px`;
-            this._container.style.top = `${initialTop + dy}px`;
+            const [left, top] = clampToViewport(initialLeft + dx, initialTop + dy);
+            this._container.style.left = `${left}px`;
+            this._container.style.top = `${top}px`;
         };
 
         const onDragEnd = () => {
@@ -328,8 +371,10 @@ export class LyricsPlayer {
             document.removeEventListener('touchend', onDragEnd);
         };
 
-        titlebar.addEventListener('mousedown', onDragStart);
-        titlebar.addEventListener('touchstart', onDragStart, { passive: false });
+        // 用 capture 阶段在容器上统一接管拖拽：
+        // 标题栏与（出屏时的）歌词区都可作为拖拽把手，无需在标题栏单独绑定。
+        this._container.addEventListener('mousedown', onDragStart, true);
+        this._container.addEventListener('touchstart', onDragStart, { capture: true, passive: false });
 
         // --- 进度条区域 ---
         const progressArea = document.createElement('div');
@@ -470,16 +515,58 @@ export class LyricsPlayer {
         this._lyricsContent = document.createElement('div');
         this._lyricsContent.className = 'st-is-lyrics-content';
 
+        // mini 模式下的单行当前歌词（位于 controls 之后、content 之前）
+        this._miniCurrentLine = document.createElement('div');
+        this._miniCurrentLine.className = 'lp-mini-current-line';
+        this._miniCurrentLine.textContent = '-';
+
         this._renderLyricLines();
 
         // --- 组装 ---
         this._container.appendChild(titlebar);
         this._container.appendChild(progressArea);
         this._container.appendChild(controlsArea);
+        this._container.appendChild(this._miniCurrentLine);
         this._container.appendChild(this._lyricsContent);
+
+        // 默认进入 mini 小窗模式
+        this.isMini = true;
+        this._container.classList.add('lp-mini');
+        this._syncMiniCurrentLine();
 
         document.body.appendChild(this._backdrop);
         document.body.appendChild(this._container);
+    }
+
+    /**
+     * 切换 mini 小窗 / 完整滚动歌词模式。
+     */
+    _toggleMini() {
+        this.isMini = !this.isMini;
+        this._container.classList.toggle('lp-mini', this.isMini);
+
+        const icon = this._btnMiniToggle && this._btnMiniToggle.querySelector('i');
+        if (icon) {
+            icon.className = this.isMini
+                ? 'fa-solid fa-chevron-down'
+                : 'fa-solid fa-chevron-up';
+        }
+        if (this.isMini) this._syncMiniCurrentLine();
+    }
+
+    /**
+     * 把当前高亮歌词同步到 mini 的单行显示区。
+     */
+    _syncMiniCurrentLine() {
+        if (!this._miniCurrentLine) return;
+        // 与 _updateLineHighlights 的 'active' 类保持一致
+        const active = this._lyricsContent
+            && this._lyricsContent.querySelector('.st-is-lyrics-line.active');
+        const text = active
+            ? active.textContent.replace(/\u00A0/g, ' ').trim()
+            : '';
+        this._miniCurrentLine.textContent = text || '-';
+        this._miniCurrentLine.title = text; // 桌面端悬停看完整文本
     }
 
     setPlayingState(isPlaying) {
@@ -796,19 +883,6 @@ export class LyricsPlayer {
         }
     }
 
-    _updateLineHighlights(activeIndex) {
-        for (let i = 0; i < this._lineElements.length; i++) {
-            const el = this._lineElements[i];
-            if (!el) continue;
-
-            if (i === activeIndex) {
-                el.classList.add('st-is-lyrics-line-active');
-            } else {
-                el.classList.remove('st-is-lyrics-line-active');
-            }
-        }
-    }
-
     _scrollToActiveLine(activeIndex) {
         const container = this._lyricsContent;
         const lineEl = this._lineElements[activeIndex];
@@ -826,6 +900,7 @@ export class LyricsPlayer {
             behavior: 'smooth'
         });
     }
+
 
     /**
      * 更新当前高亮的音频片段（由 Engine 驱动）
@@ -881,25 +956,9 @@ export class LyricsPlayer {
                 el.classList.add('played');
             }
         }
-    }
 
-    _scrollToActiveLine(lineIndex) {
-        if (!this._lineElements || !this._lyricsContent) return;
-        const el = this._lineElements[lineIndex];
-        if (!el) return;
-
-        const container = this._lyricsContent;
-        const containerHeight = container.clientHeight;
-        const lineTop = el.offsetTop;
-        const lineHeight = el.offsetHeight;
-
-        // 将当前行滚动到容器的中央
-        const targetScroll = lineTop - containerHeight / 2 + lineHeight / 2;
-
-        container.scrollTo({
-            top: targetScroll,
-            behavior: 'smooth'
-        });
+        // mini 模式没有滚动歌词区，改为把当前行同步到单行显示
+        if (this.isMini) this._syncMiniCurrentLine();
     }
 
     /**

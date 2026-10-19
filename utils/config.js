@@ -1,5 +1,13 @@
 export const extensionName = "st-immersive-sound";
-export const extensionFolderPath = `scripts/extensions/third-party/st-immersive-sound`;
+
+// 插件目录路径：从模块自身 URL 动态推导，而不是硬编码目录名。
+// 这样同一份构建产物无论部署在哪个目录名下（原版 / -fix / -test），
+// Tone.js / 设置页 HTML / 歌词播放器 CSS / lame.min.js 等资源都从
+// 自己的目录加载，不会错误地借用同目录名硬编码的那个插件。
+// esbuild 打包后 import.meta.url 指向最终的 index.js，因此推导出的
+// 就是 index.js 所在的插件目录。
+const _selfFolder = new URL('.', import.meta.url).pathname.split('/').filter(Boolean).pop();
+export const extensionFolderPath = `scripts/extensions/third-party/${_selfFolder || 'st-immersive-sound'}`;
 
 export const eventNames = {
     REGEX_TEST_MESSAGE: 'st-immersive-sound:regex-test-message',

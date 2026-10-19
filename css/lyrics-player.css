@@ -30,6 +30,71 @@
     transition: border-radius 0.3s ease, width 0.3s ease, height 0.3s ease;
 }
 
+/* --- mini 小窗模式 ---
+ * 收起为「标题栏 + 进度条 + 功能按钮 + 单行当前歌词」，高度自适应。
+ * 关键点：overflow 必须放开，否则向下展开的音量面板会被容器裁剪。
+ * 相应的圆角补在首尾两段上，维持胶囊外观。
+ */
+.st-is-lyrics-player.lp-mini {
+    width: 380px;
+    height: auto;
+    max-height: 90vh;
+    overflow: visible;
+}
+
+@media (max-width: 767px), (max-height: 600px) {
+    .st-is-lyrics-player.lp-mini {
+        width: 92vw;
+    }
+}
+
+/* mini 下隐藏不需要的部分 */
+.st-is-lyrics-player.lp-mini .st-is-lyrics-content,
+.st-is-lyrics-player.lp-mini .st-is-lyrics-time,
+.st-is-lyrics-player.lp-mini .lp-fullscreen-btn {
+    display: none;
+}
+
+/* 圆角补偿：overflow 放开后由首尾元素自己画圆角 */
+.st-is-lyrics-player.lp-mini .st-is-lyrics-titlebar {
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+}
+
+.st-is-lyrics-player.lp-mini .lp-mini-current-line {
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+}
+
+@media (max-width: 767px), (max-height: 600px) {
+    .st-is-lyrics-player.lp-mini .st-is-lyrics-titlebar {
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+    }
+    .st-is-lyrics-player.lp-mini .lp-mini-current-line {
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
+    }
+}
+
+/* mini 模式的单行当前歌词 */
+.lp-mini-current-line {
+    flex-shrink: 0;
+    min-height: 20px;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--lp-titlebar-text, #fff);
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    opacity: 0.95;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: move;
+}
+
 /* 全屏模式 */
 .st-is-lyrics-player.fullscreen {
     top: 0 !important;
