@@ -14746,6 +14746,7 @@ function getEffectiveConfigForRequestType(type) {
     max_tokens: typeof apiProfile.max_tokens === "number" ? apiProfile.max_tokens : 512,
     stream: !!apiProfile.stream,
     bypass_proxy: !!apiProfile.bypass_proxy,
+    reasoning_effort: typeof apiProfile.reasoning_effort === "string" ? apiProfile.reasoning_effort.trim() : "",
     merge_system_user: apiProfile.merge_system_user !== false,
     // 默认 true
     send_images: !!apiProfile.send_images,
@@ -14887,7 +14888,8 @@ async function executeTypedLLMRequest(prompt2, type, signal) {
     stream: stream2,
     bypass_proxy,
     merge_system_user,
-    send_images
+    send_images,
+    reasoning_effort
   } = cfg;
   if (!api_url) throw new Error("未配置 API Base URL");
   if (!model) throw new Error("未配置模型");
@@ -14903,6 +14905,7 @@ async function executeTypedLLMRequest(prompt2, type, signal) {
     max_tokens,
     stream: !!stream2
   };
+  if (reasoning_effort) payload.reasoning_effort = reasoning_effort;
   let url, headers, body;
   if (bypass_proxy) {
     url = baseUrl + "/chat/completions";
@@ -14991,6 +14994,9 @@ var streamToggle;
 var bypassProxyToggle;
 var mergeSystemUserToggle;
 var sendImagesToggle;
+var reasoningEffortSelect;
+var queryCapsButton;
+var capsResultSpan;
 var modelCustomInput;
 var currentLLMRequestController;
 function updateCombinedPrompt(text) {
@@ -15169,6 +15175,7 @@ function onProfileSelectChange2() {
     bypassProxyToggle.prop("checked", !!profile.bypass_proxy);
     mergeSystemUserToggle.prop("checked", profile.merge_system_user !== false);
     sendImagesToggle.prop("checked", !!profile.send_images);
+    if (reasoningEffortSelect) reasoningEffortSelect.val(profile.reasoning_effort || "");
     extension_settings24[extensionName].current_llm_profile = profileName;
     saveSettingsDebounced13();
   }
@@ -15191,6 +15198,8 @@ function collectProfileDataFromUI() {
     bypass_proxy: !!bypassProxyToggle?.prop("checked"),
     merge_system_user: !!mergeSystemUserToggle?.prop("checked"),
     send_images: !!sendImagesToggle?.prop("checked"),
+    // 思考等级：'' 表示不发送该字段（跟随服务端默认）
+    reasoning_effort: (reasoningEffortSelect?.val() || "").trim(),
     // 保留向后兼容字段（不会被新 UI 修改）
     history: existing.history
   };
@@ -15298,6 +15307,51 @@ function onImportProfileClick2() {
   };
   input.click();
 }
+async function onQueryCapsClick() {
+  const baseUrl = (apiUrlInput.val() || "").replace(/\/$/, "");
+  const apiKey = apiKeyInput.val();
+  if (!baseUrl || !apiKey) {
+    toastr.warning("请先填写 API Base URL 和 API Key。");
+    return;
+  }
+  const root = baseUrl.replace(/\/v1\/?$/, "");
+  const original = queryCapsButton.html();
+  queryCapsButton.html('<i class="fa-solid fa-spinner fa-spin"></i>');
+  queryCapsButton.prop("disabled", true);
+  try {
+    const headers = { "Authorization": `Bearer ${apiKey}` };
+    const [modelsRes, propsRes] = await Promise.all([
+      fetch(root + "/v1/models", { headers }),
+      fetch(root + "/props", { headers })
+    ]);
+    const lines = [];
+    if (modelsRes.ok) {
+      const models = tryParseJsonText2(await modelsRes.text())?.data || [];
+      lines.push(`模型 (${models.length}): ${models.map((m) => m.id).join(", ") || "无"}`);
+    } else {
+      lines.push(`/v1/models 查询失败: HTTP ${modelsRes.status}`);
+    }
+    if (propsRes.ok) {
+      const props = tryParseJsonText2(await propsRes.text()) || {};
+      if (props.default_generation_settings?.n_ctx) lines.push(`上下文长度: ${props.default_generation_settings.n_ctx}`);
+      if (props.model_alias) lines.push(`模型别名: ${props.model_alias}`);
+      if (props.build_info) lines.push(`服务端: ${props.build_info}`);
+      const caps = props.chat_template_caps;
+      if (caps) lines.push(`模板能力: ${Object.entries(caps).filter(([, v]) => v === true).map(([k]) => k).join(", ") || "无"}`);
+    } else {
+      lines.push(`/props 查询失败: HTTP ${propsRes.status}（非 Strata 类服务端可能不支持）`);
+    }
+    lines.push("思考等级档位: off / low / medium / high / xhigh（服务端不支持某档时请求会返回 400）");
+    if (capsResultSpan) capsResultSpan.text(lines.join("\n"));
+    toastr.success("服务端能力查询完成。");
+  } catch (error) {
+    if (capsResultSpan) capsResultSpan.text(`查询失败: ${error.message}`);
+    toastr.error(`查询失败: ${error.message}`);
+  } finally {
+    queryCapsButton.html(original);
+    queryCapsButton.prop("disabled", false);
+  }
+}
 async function onFetchModelsClick() {
   const baseUrl = apiUrlInput.val();
   const apiKey = apiKeyInput.val();
@@ -15381,6 +15435,8 @@ async function onTestLLMClick() {
       max_tokens,
       stream: false
     };
+    const effort = (collectProfileDataFromUI().reasoning_effort || "").trim();
+    if (effort) body.reasoning_effort = effort;
     const response = await fetch(requestUrl, {
       method: "POST",
       headers: {
@@ -15504,6 +15560,9 @@ function initLLMSettings() {
   mergeSystemUserToggle = $("#llm_merge_system_user");
   sendImagesToggle = $("#llm_send_images");
   modelCustomInput = $("#llm_model_custom");
+  reasoningEffortSelect = $("#llm_reasoning_effort");
+  queryCapsButton = $("#llm_query_caps_button");
+  capsResultSpan = $("#llm_caps_result");
   modelSelect.on("change", () => {
     const v = modelSelect.val();
     if (v) modelCustomInput.val(v);
@@ -15532,6 +15591,15 @@ function initLLMSettings() {
   bypassProxyToggle.on("change", onAdvancedToggleChange);
   mergeSystemUserToggle.on("change", onAdvancedToggleChange);
   sendImagesToggle.on("change", onAdvancedToggleChange);
+  reasoningEffortSelect?.on("change", () => {
+    const profileName = profileSelect2.val();
+    if (!profileName) return;
+    const profiles = extension_settings24[extensionName].llm_profiles || {};
+    if (!profiles[profileName]) return;
+    profiles[profileName].reasoning_effort = (reasoningEffortSelect.val() || "").trim();
+    saveSettingsDebounced13();
+  });
+  queryCapsButton?.on("click", onQueryCapsClick);
   eventSource6.on(eventNames.LLM_GET_PROMPT_REQUEST, onGetPromptRequest);
   eventSource6.on(eventNames.LLM_EXECUTE_REQUEST, onExecuteRequest);
   temperatureSlider.on("input", () => temperatureValue.val(temperatureSlider.val()));

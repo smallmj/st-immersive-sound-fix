@@ -179,6 +179,15 @@ npm run build   # esbuild 打包 → 生成 index.js（未混淆，字节级可�
 ---
 享受你的沉浸式阅读体验吧！
 
+## LLM 思考等级（reasoning effort）
+
+「大模型设置」的每个 LLM 预设新增**思考等级**选项：跟随服务端默认 / off / low / medium / high / xhigh。选中档位后，插件会在 `/chat/completions` 请求里附带 `reasoning_effort` 字段（off 以 `none` 发送）。
+
+- 已在 Strata（Windows 本地引擎）上实测：五档均被接受并真实影响 prompt（`none` 直接出答案不思考，low/high/xhigh 注入不同强度的思考指令）。
+- **酒馆代理路径（未开「绕过酒馆代理」）会丢弃该字段**（SillyTavern 白名单化请求体）——需要思考等级生效请开启直连。
+- 未知档位会被 Strata 静默按 medium 处理，不会报错。
+- 面板上的「查询服务端能力」按钮（仅直连可用）可查看服务端模型列表、上下文长度与模板能力。
+
 ## 帮助
 
 - 原版功能疑问 / 投喂原作者：[飞书文档](https://gxcgf4l6b2y.feishu.cn/wiki/IS3xwfqG7ii78pkwqkkcE8donUb?from=from_copylink) | [投喂作者](https://afdian.com/a/cqgnyy)

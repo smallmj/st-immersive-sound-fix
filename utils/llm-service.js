@@ -118,6 +118,7 @@ export function getEffectiveConfigForRequestType(type) {
         max_tokens: typeof apiProfile.max_tokens === 'number' ? apiProfile.max_tokens : 512,
         stream: !!apiProfile.stream,
         bypass_proxy: !!apiProfile.bypass_proxy,
+        reasoning_effort: typeof apiProfile.reasoning_effort === 'string' ? apiProfile.reasoning_effort.trim() : '',
         merge_system_user: apiProfile.merge_system_user !== false, // 默认 true
         send_images: !!apiProfile.send_images,
         _api_profile_name: resolvedApiName,
@@ -285,7 +286,7 @@ export async function executeTypedLLMRequest(prompt, type, signal) {
 
     const cfg = getEffectiveConfigForRequestType(normalizedType);
     const { api_url, api_key, model, temperature, top_p, max_tokens,
-        stream, bypass_proxy, merge_system_user, send_images } = cfg;
+        stream, bypass_proxy, merge_system_user, send_images, reasoning_effort } = cfg;
 
     if (!api_url) throw new Error('未配置 API Base URL');
     if (!model) throw new Error('未配置模型');
@@ -304,6 +305,10 @@ export async function executeTypedLLMRequest(prompt, type, signal) {
         max_tokens,
         stream: !!stream,
     };
+    // 思考等级：选中档位时随请求发送（off 在 UI 已映射为 none；空 = 跟随服务端默认，不加字段）。
+    // 注意：实测（2026-10-19，Strata + SillyTavern）代理路径 /api/backends/chat-completions/generate
+    // 会丢弃该字段，仅 bypass_proxy（直连）路径能真正生效。
+    if (reasoning_effort) payload.reasoning_effort = reasoning_effort;
 
     let url, headers, body;
     if (bypass_proxy) {
